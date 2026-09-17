@@ -1,5 +1,5 @@
 import unittest
-from prepare_fragments import normalize, split_for
+from prepare_fragments import normalize, split_for, read_table
 from input_validation import validate_groups, validate_coordinates
 from run_checks import positive_int, fresh_output, export_ready_mol, run_record, load_endpoint_spec
 from rdkit import Chem
@@ -21,6 +21,30 @@ import hashlib
 import zipfile
 
 class FragmentTests(unittest.TestCase):
+    def test_excel_source_rows_survive_blank_rows(self):
+        from openpyxl import Workbook
+        with TemporaryDirectory() as tmp:
+            path=Path(tmp)/'input.xlsx'
+            workbook=Workbook(); sheet=workbook.active
+            sheet.append(['Smiles']); sheet.append(['CC']); sheet.append([None]); sheet.append(['CO'])
+            workbook.save(path); workbook.close()
+            self.assertEqual(read_table(path,{'Smiles'}),[(2,{'Smiles':'CC'}),(4,{'Smiles':'CO'})])
+
+    def test_csv_physical_rows_include_multiline_and_blank_lines(self):
+        with TemporaryDirectory() as tmp:
+            path=Path(tmp)/'input.CSV'
+            path.write_text('Smiles,Note\nCC,"first\nsecond"\n\nCO,last\n',encoding='utf8')
+            rows=read_table(path,{'Smiles'})
+            self.assertEqual([line for line,row in rows],[2,5])
+            self.assertEqual(rows[1][1]['Smiles'],'CO')
+
+    def test_ambiguous_and_empty_tables_rejected(self):
+        with TemporaryDirectory() as tmp:
+            path=Path(tmp)/'input.csv'
+            for text in ('Smiles,Smiles\nCC,CO\n','Smiles\nCC,CO\n','Smiles\n','Other\nCC\n'):
+                path.write_text(text)
+                with self.assertRaises(ValueError): read_table(path,{'Smiles'})
+
     def test_attachment_is_preserved(self):
         canonical,parent,count=normalize('[R1]CCO')
         self.assertIn('[*:1]',canonical)

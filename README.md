@@ -1,27 +1,28 @@
-# PROTAC DecompDiff Starter
+# PROTAC DecompDiff
 
-基于 [DecompDiff](https://github.com/bytedance/DecompDiff) 的可复现项目起点：整理 PROTAC 两端片段数据、运行蛋白口袋条件生成、导出并核验分子结果。
+这个项目用来整理 PROTAC 的 warhead 和 E3 ligand 数据，并运行 DecompDiff 的口袋条件分子生成。代码基于[原作者实现](https://github.com/bytedance/DecompDiff)，补充了数据处理、输入检查、结果导出和测试。
 
-**这是工程复现与数据准备工具，不是已经训练好的 PROTAC 专用模型。** `warhead` / `e3_ligand` 是任务标签；当前网络仍是作者的预训练 DecompDiff。尚未实现 linker 连接位点保持、PROTAC 微调或活性验证。
+目前用的是原作者的预训练权重。表格处理和分子生成可以分别运行，但整理好的片段还没有接入训练；把任务名改成 `warhead` 或 `e3_ligand`，也不会让模型自动学会生成对应片段。
 
-## 从哪里开始
+## 先跑一个小例子
 
-| 你想做什么 | 要求 | 入口 |
-|---|---|---|
-| 先确认项目能跑 | Python 3.10，无需 GPU | 下方五分钟演示 |
-| 整理自己的表格 | Excel/CSV | `prepare_fragments.py` |
-| 生成一个口袋中的候选配体 | 模型依赖、权重、对齐的 PDB/SDF | `run_endpoint.py` |
-| 复现官方参考先验流程 | 完整模型环境和官方分解数据 | [基线说明](docs/INFERENCE.md) |
-
-## 五分钟数据演示（无需 GPU）
-
-从仓库根目录执行。Python 3.10 已测试。
+需要 Python 3.10。这部分不用显卡，也不用下载权重。先克隆仓库并进入目录：
 
 ```bash
+git clone https://github.com/songfy0118/protac-decompdiff-starter.git
+cd protac-decompdiff-starter
 python -m venv .venv
-# Windows PowerShell:
+```
+
+Windows PowerShell 激活环境：
+
+```powershell
 .venv\Scripts\Activate.ps1
-# Linux/macOS 使用: source .venv/bin/activate
+```
+
+Linux/macOS 使用 `source .venv/bin/activate`。如果 Windows 不允许执行激活脚本，下面命令中的 `python` 可以直接换成 `.venv\Scripts\python.exe`。
+
+```bash
 python -m pip install --upgrade pip
 python -m pip install -r requirements-data.txt
 python doctor.py
@@ -30,52 +31,49 @@ python prepare_fragments.py --source-dir examples/table_inputs --source-map exam
 python verify_outputs.py --data-dir runs/demo
 ```
 
-不便激活环境时，Windows 可将 `python` 换成 `.venv\Scripts\python.exe`。
-无 PyTorch 的环境会明确跳过一个 `.pt` 导出测试，其余检查照常执行。
+例子使用人为构造的简单分子，只用于检查程序。应得到 4 条片段记录、2 个母体分组、1 条配对记录，没有隔离记录。输出在 `runs/demo/`；再次运行时换一个新目录，例如 `runs/demo-02/`。
 
-演示输入是人为构造的玩具分子，**不是已知活性 PROTAC**。预期输出为 4 条片段记录、2 个母体分组、1 条配对记录、0 条隔离记录；完整研究数据没有随仓库上传。
-重复运行请换一个新的 `--output-dir`，已有非空目录不会被覆盖。
+测试中有一项需要 PyTorch。只装数据依赖时，这一项会显示 `skipped`，其余测试应通过。
 
-## 数据与结果
+## 换成自己的数据
 
-`prepare_fragments.py` 接受标准列名的 Excel/CSV，将 `[R1]` / `[R2]` 转成保留映射的 `[*:1]` / `[*:2]`，按封端母体进行确定性划分，保留来源和异常记录。[输入格式](docs/DATA.md)
+把原始表格放进 `data/raw/`，按[数据说明](docs/DATA.md)准备文件名映射，再执行同一条处理命令。原始研究数据没有上传到仓库，`examples/table_inputs/` 只是格式样例。
 
-`sample_results/` 保存两次实际 GPU 运行的输出及摘要。每次使用一个样本、完整 1,000 步，均得到一个可读取的连通分子。这仅验证运行链路，不是质量或成功率基准。SDF 的手性由生成的三维坐标推断，未做实验验证。
+处理后先看 `summary.json` 的数量和 `validation_errors.csv` 的错误，再看 `fragments.csv`。要找某条片段来自哪里，用它的 `record_id` 查 `provenance.jsonl`，可以追到源文件和行号。
 
-![实际生成示例](sample_results/baseline/generated.png)
+连接标记 `[R1]`、`[R2]` 会保留为 `[*:1]`、`[*:2]`。同一封端母体的不同连接位置会放进同一个数据集划分，避免直接重复。这个划分没有按靶点或分子骨架留出。
 
-```bash
-python verify_outputs.py
-```
+## 运行分子生成
 
-该命令核验示例 SDF、SMILES、数量、连通性及运行清单；加入 `--data-dir` 才会检查处理后的表格，未检查项不会标为通过。
-
-## 完整模型运行
-
-见 [安装与推理指南](docs/INFERENCE.md)。权重和大型 LMDB 不在 Git 中，下载位置、期望文件名和目录结构均列在指南里。
+完整环境、权重下载和目录要求见[推理说明](docs/INFERENCE.md)。装好以后可以先用仓库里的蛋白口袋和参考配体：
 
 ```bash
 python run_endpoint.py --spec examples/test_spec.json --checkpoint assets/decompdiff.pt --output runs/endpoint-001 --samples 1
+python verify_outputs.py --endpoint runs/endpoint-001
 ```
 
-自定义输入需要蛋白 PDB、处于同一坐标系的参考配体 SDF，以及明确的原子分组。不能把 SMILES 的任意三维构象直接放进蛋白口袋。`arms/scaffold` 不等同于 `warhead/E3`。
+`candidates.sdf` 保存生成分子，`report.json` 记录重建结果，`run_manifest.json` 记录输入摘要和运行状态。运行结束不一定代表所有样本都重建成功，要检查报告中的 `reconstructed` 和每条结果的 `connected`。
 
-## 项目结构
+`sample_results/` 保留了两次实际运行的结果：各生成一个样本，使用完整 1,000 步，均得到一个可读取的连通分子。这个样本量只能确认程序能跑，不能用来估计生成质量或成功率。
 
-- `DecompDiff-main/`：保留上游实现及少量兼容性修改。
-- `prepare_fragments.py`：输入校验、标准化、去重、划分和来源记录。
-- `run_endpoint.py` / `run_baseline.py`：自定义口袋与官方基线入口。
-- `run_checks.py`：运行记录、输入检查和一致的分子导出。
-- `verify_outputs.py`：数据与结果的交叉核验。
-- `doctor.py`：环境检查；`test_pipeline.py`：回归测试。
-- `package_project.py`：可选打包及逐文件哈希校验。
+![生成的示例分子](sample_results/baseline/generated.png)
 
-## 研究边界与后续工作
+## 还差什么
 
-下一步需明确一个靶蛋白和一种 E3、参考结合结构及 linker 连接位点，再构建对应的三维训练/评估数据、实现位点保持和微调。现有代码没有声称这些步骤已经完成。
-数据分割目前按母体分子分组，不是按骨架或靶点留出，不能由此主张跨骨架或跨靶点泛化。
+要用于同学的具体课题，首先需要选定靶蛋白和 E3，并准备相应的结合结构、参考片段和 linker 连接位置。输入 PDB 和 SDF 必须在同一坐标系，不能把任意生成的配体构象直接当作结合姿态。
 
-## 来源与许可
+后面的主要工作是把这些数据接入训练，加入连接位点约束，再设置独立的评估集。当前代码没有完成 PROTAC 微调、连接位点保持、对接评估或活性验证。DecompDiff 的 arms/scaffold 分组也不能直接当作 warhead/E3 分组。
 
-原论文：[DecompDiff: Diffusion Models with Decomposed Priors for Structure-Based Drug Design](https://proceedings.mlr.press/v202/guan23a.html)，Guan 等，ICML 2023。
-上游以 CC BY-NC 4.0 发布；本仓库保留原许可和文件级声明，见 [LICENSE](LICENSE) 与 [第三方说明](THIRD_PARTY_NOTICES.md)。本项目是改编和复现工具，不代表原作者背书。
+## 文档与代码
+
+- [数据格式与错误处理](docs/DATA.md)
+- [模型安装与推理](docs/INFERENCE.md)
+- [测试记录](docs/VALIDATION.md)
+
+常用入口是 `prepare_fragments.py`、`run_endpoint.py` 和 `verify_outputs.py`。`run_baseline.py` 用于官方数据基线；`doctor.py` 检查环境。上游代码保存在 `DecompDiff-main/`。
+
+## 引用与许可
+
+Guan 等，*DecompDiff: Diffusion Models with Decomposed Priors for Structure-Based Drug Design*，ICML 2023。[论文](https://proceedings.mlr.press/v202/guan23a.html)
+
+保留上游 CC BY-NC 4.0 许可及文件内的第三方声明，详见 [LICENSE](LICENSE) 和 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

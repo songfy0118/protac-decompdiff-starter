@@ -46,6 +46,45 @@ def write_csv(path, rows, fields):
     with path.open('w',newline='',encoding='utf-8-sig') as f:
         writer=csv.DictWriter(f,fieldnames=fields); writer.writeheader(); writer.writerows(rows)
 
+def read_table(source, required):
+    """Return physical source row numbers; reject ambiguous column mappings."""
+    source=Path(source)
+    def collect(headers, numbered_rows):
+        headers=list(headers or [])
+        named=[h for h in headers if h is not None and h!='']
+        if len(named)!=len(set(named)):
+            raise ValueError(f'{source.name}: duplicate column names')
+        missing=required-set(named)
+        if missing: raise ValueError(f'{source.name}: missing columns {sorted(missing)}')
+        records=[]
+        for line,values in numbered_rows:
+            if not any(value is not None and value!='' for value in values): continue
+            if len(values)>len(headers):
+                raise ValueError(f'{source.name}: row {line} has more values than columns')
+            row=dict(zip(headers,list(values)+[None]*(len(headers)-len(values))))
+            records.append((line,row))
+        if not records: raise ValueError(f'{source.name}: empty table')
+        return records
+    if source.suffix.lower()=='.csv':
+        with source.open(encoding='utf-8-sig',newline='') as stream:
+            reader=csv.reader(stream)
+            headers=next(reader,None)
+            def numbered():
+                while True:
+                    line=reader.line_num+1
+                    values=next(reader,None)
+                    if values is None: return
+                    yield line,values
+            return collect(headers,numbered())
+    if source.suffix.lower()!='.xlsx':
+        raise ValueError(f'{source.name}: expected .csv or .xlsx')
+    workbook=load_workbook(source,read_only=True,data_only=True)
+    try:
+        values=iter(workbook.active.values)
+        return collect(next(values,None),enumerate(values,2))
+    finally:
+        workbook.close()
+
 def main():
     p=argparse.ArgumentParser(); p.add_argument('--source-dir',type=Path,required=True)
     p.add_argument('--source-map',type=Path,help='JSON mapping e3_ligand/warhead/protac/paired to input filenames')
@@ -62,17 +101,10 @@ def main():
     errors=[]; summary={}; fragments=defaultdict(list); pairs=[]
     for role,filename in sources.items():
         source=args.source_dir/filename
-        if source.suffix=='.csv':
-            with source.open(encoding='utf-8-sig',newline='') as f: rows=list(csv.DictReader(f))
-        else:
-            wb=load_workbook(source,read_only=True,data_only=True)
-            values=iter(wb.active.values); headers=next(values)
-            rows=[dict(zip(headers,r)) for r in values if any(x is not None for x in r)]; wb.close()
         required={'id_protac','linker_canonical','warhead_canonical','e3_ligand_canonical','smiles_canonical'} if role=='paired' else {'Compound ID','Uniprot','Target','Smiles'}
-        if not rows or required-set(rows[0]):
-            raise ValueError(f'{filename}: empty table or missing columns {sorted(required-set(rows[0] if rows else {}))}')
+        rows=read_table(source,required)
         summary[role]={'rows':len(rows),'sha256':hashlib.sha256(source.read_bytes()).hexdigest()}
-        for line,row in enumerate(rows,2):
+        for line,row in rows:
             fields = [('warhead','warhead_canonical'),('e3_ligand','e3_ligand_canonical'),('protac','smiles_canonical')] if role=='paired' else [(role,'Smiles')]
             pair={'source_row':line,'protac_id':row.get('id_protac')}
             for molecule_role,column in fields:

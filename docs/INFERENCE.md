@@ -60,3 +60,15 @@ python verify_outputs.py --baseline runs/baseline-001
 ```
 
 `crossdocked_pocket10_mol.lmdb` 是另一种预处理格式，不能直接改名替代本项目所需 LMDB。基线依赖可信的作者序列化数据；`export_baseline.py` 只用于自己刚生成的 `.pt`，不要加载来历不明的 pickle 文件。
+
+## 常见问题
+
+| 现象 | 处理方式 |
+|---|---|
+| `Output directory is not empty` | 换一个新的 `--output` 目录。旧结果保留，避免覆盖。 |
+| `No module named torch_scatter` 或扩展加载失败 | 在当前虚拟环境中重装上面指定的 PyTorch 和对应扩展，先运行 `doctor.py --inference`。 |
+| `groups must contain one integer per hydrogen-removed SDF atom` | 根据参考 SDF 去氢后的原子顺序重填 `atom_groups`，不能按 SMILES 的字符位置填写。 |
+| GPU 显存不足 | 关闭占用显存的程序，先用 `--samples 1`。仍失败时可用 `--device cpu` 检查流程，但 CPU 耗时未测试。 |
+| 程序完成，但生成数量少于请求数量 | 查看 `report.json` 的每条结果。采样后可能重建失败，不能把缺失分子当成有效候选。 |
+
+先运行仓库示例，再换自己的结构，比较容易区分环境问题和输入问题。`doctor.py` 只能检查依赖与设备是否可用，不能判断参考配体是否处于正确的结合位置。
