@@ -1,0 +1,59 @@
+{
+  "role": "test_demo",
+  "requested": 1,
+  "steps": 1000,
+  "seed": 2021,
+  "checkpoint_sha256": "9d3daf75ff37fbc314f2dd43f899c7c104a8f68992cad5c0e8446574fac39c17",
+  "spec": {
+    "role": "test_demo",
+    "protein_pdb": "test_pocket.pdb",
+    "reference_sdf": "test_reference.sdf",
+    "atom_groups": [
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      1,
+      1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      2,
+      2,
+      2,
+      2,
+      2
+    ],
+    "note": "Official test case 0; not a selected PROTAC target. Atom groups from official preprocessed record 99165."
+  },
+  "protein_sha256": "198f92307ae6a283233fd95f7ae9e16f87c3a8bf4090c84446fae4471ae7d3f0",
+  "reference_sha256": "7c3f61b903a6a91425e4d4ddda5b4d61192772d904ec556a7bb69234e8bcedc4",
+  "reconstructed": 1,
+  "results": [
+    {
+      "sample": 0,
+      "smiles": "NC(=O)c1ccc(CCCc2sc(CCCN3CC[C@H](O)C3)c(CO)c2NC=O)cc1",
+      "connected": true
+    }
+  ],
+  "method": "Unmodified pretrained DecompDiff with reference-derived priors",
+  "stereochemistry": "Inferred by RDKit from generated 3D coordinates; unvalidated.",
+  "limits": "No PROTAC fine-tuning, attachment-site guarantee, affinity or degradation validation."
+}

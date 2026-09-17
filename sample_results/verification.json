@@ -1,0 +1,19 @@
+{
+  "tables_checked": true,
+  "fragment_rows": 4,
+  "unique_parent_groups": 2,
+  "cross_split_parent_overlap": 0,
+  "pair_rows": 1,
+  "quarantined_pairs": 0,
+  "provenance_links_valid": true,
+  "molecule_exports": {
+    "baseline": {
+      "readable_molecules": 1,
+      "connected": 1
+    },
+    "endpoint_demo": {
+      "readable_molecules": 1,
+      "connected": 1
+    }
+  }
+}

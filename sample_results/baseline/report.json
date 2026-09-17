@@ -1,0 +1,19 @@
+{
+  "method": "Official DecompDiff reference prior, pretrained weights",
+  "data_id": 0,
+  "steps": 1000,
+  "checkpoint_sha256": "9d3daf75ff37fbc314f2dd43f899c7c104a8f68992cad5c0e8446574fac39c17",
+  "samples": 1,
+  "results": [
+    {
+      "sample": 0,
+      "valid": true,
+      "connected": true,
+      "smiles": "CN[C@H](CC[C@H]1CCN2NC(NC[C@H]3CC[C@H](O)CC3)[C@H](C(=O)O)C12)C[C@H](N)C(=O)O",
+      "heavy_atoms": 31,
+      "molecular_weight": 441.5730000000002
+    }
+  ],
+  "stereochemistry": "Inferred by RDKit from generated 3D coordinates; unvalidated.",
+  "limits": "A single runtime test; no affinity, degradation, novelty benchmark or PROTAC fine-tuning claim."
+}

@@ -1,0 +1,6 @@
+{
+  "e3_ligand": "e3_ligand.csv",
+  "warhead": "warhead.csv",
+  "protac": "protac.csv",
+  "paired": "paired.csv"
+}

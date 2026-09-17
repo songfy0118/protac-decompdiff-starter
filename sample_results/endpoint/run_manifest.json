@@ -1,0 +1,12 @@
+{
+  "role": "test_demo",
+  "requested": 1,
+  "seed": 2021,
+  "steps": 1000,
+  "checkpoint_sha256": "9d3daf75ff37fbc314f2dd43f899c7c104a8f68992cad5c0e8446574fac39c17",
+  "protein_sha256": "198f92307ae6a283233fd95f7ae9e16f87c3a8bf4090c84446fae4471ae7d3f0",
+  "reference_sha256": "7c3f61b903a6a91425e4d4ddda5b4d61192772d904ec556a7bb69234e8bcedc4",
+  "status": "completed",
+  "started_at": "2026-09-17T17:35:55.746071+00:00",
+  "finished_at": "2026-09-17T17:37:27.060299+00:00"
+}
