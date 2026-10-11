@@ -558,11 +558,17 @@ class DecompScorePosNet3D(nn.Module):
                          ligand_fc_bond_index=None, init_ligand_fc_bond_type=None, batch_ligand_bond=None,
                          num_steps=None, center_pos_mode=None,
                          energy_drift_opt=None,
-                         full_protein_pos=None, full_batch_protein=None
+                         full_protein_pos=None, full_batch_protein=None,
+                         fixed_atom_types=None, fixed_bond_types=None, fixed_position_mask=None,
+                         start_timestep=None
                          ):
 
+        if start_timestep is None:
+            start_timestep = self.num_timesteps - 1
         if num_steps is None:
-            num_steps = self.num_timesteps
+            num_steps = start_timestep + 1
+        if not 0 <= start_timestep < self.num_timesteps or not 1 <= num_steps <= start_timestep + 1:
+            raise ValueError('Invalid diffusion start timestep or step count')
         num_graphs = batch_protein.max().item() + 1
         protein_pos, init_ligand_pos, offset = center_pos(
             protein_pos, init_ligand_pos, batch_protein, batch_ligand, mode=center_pos_mode)
@@ -571,8 +577,30 @@ class DecompScorePosNet3D(nn.Module):
         v0_pred_traj, vt_pred_traj = [], []
         bt_pred_traj = []
         ligand_pos, ligand_v, ligand_bond = init_ligand_pos, init_ligand_v, init_ligand_fc_bond_type
+        if fixed_position_mask is not None:
+            if fixed_position_mask.dtype != torch.bool or fixed_position_mask.shape != ligand_v.shape:
+                raise ValueError('Fixed position mask must be a boolean vector matching ligand atoms')
+            anchored_positions = init_ligand_pos.clone()
+        # Separate chemical constraints from the legacy coordinate-freezing mask.
+        # -1 means editable; bond constraints include absent bonds at the boundary.
+        if fixed_atom_types is not None:
+            if fixed_atom_types.shape != ligand_v.shape:
+                raise ValueError('Fixed atom types must match ligand atom shape')
+            if ((fixed_atom_types < -1) | (fixed_atom_types >= self.num_classes)).any():
+                raise ValueError('Fixed atom type outside model vocabulary')
+            fixed_atoms = fixed_atom_types >= 0
+            ligand_v = ligand_v.clone()
+            ligand_v[fixed_atoms] = fixed_atom_types[fixed_atoms]
+        if fixed_bond_types is not None:
+            if not self.bond_diffusion or fixed_bond_types.shape != ligand_bond.shape:
+                raise ValueError('Fixed bonds require matching bond-diffusion inputs')
+            if ((fixed_bond_types < -1) | (fixed_bond_types >= self.num_bond_classes)).any():
+                raise ValueError('Fixed bond type outside model vocabulary')
+            fixed_bonds = fixed_bond_types >= 0
+            ligand_bond = ligand_bond.clone()
+            ligand_bond[fixed_bonds] = fixed_bond_types[fixed_bonds]
         # time sequence
-        time_seq = list(reversed(range(self.num_timesteps - num_steps, self.num_timesteps)))
+        time_seq = list(reversed(range(start_timestep + 1 - num_steps, start_timestep + 1)))
         for i in tqdm(time_seq, desc='sampling', total=len(time_seq)):
             t = torch.full(size=(num_graphs,), fill_value=i, dtype=torch.long, device=protein_pos.device)
             preds = self(
@@ -618,6 +646,8 @@ class DecompScorePosNet3D(nn.Module):
             log_ligand_v = index_to_log_onehot(ligand_v, self.num_classes)
             log_model_prob = self.atom_type_trans.q_v_posterior(log_ligand_v_recon, log_ligand_v, t, batch_ligand)
             ligand_v_next = log_sample_categorical(log_model_prob)
+            if fixed_atom_types is not None:
+                ligand_v_next[fixed_atoms] = fixed_atom_types[fixed_atoms]
             if ligand_atom_mask is not None:
                 ligand_v_next[ligand_atom_mask == 0] = ligand_v[ligand_atom_mask == 0]
 
@@ -631,6 +661,8 @@ class DecompScorePosNet3D(nn.Module):
                 log_b_model_prob = self.bond_type_trans.q_v_posterior(
                     log_ligand_b_recon, log_ligand_b, t, batch_ligand_bond)
                 ligand_b_next = log_sample_categorical(log_b_model_prob)
+                if fixed_bond_types is not None:
+                    ligand_b_next[fixed_bonds] = fixed_bond_types[fixed_bonds]
                 ligand_bond = ligand_b_next
                 bt_pred_traj.append(log_b_model_prob.clone().cpu())
                 bond_traj.append(ligand_bond.clone().cpu())
@@ -681,6 +713,8 @@ class DecompScorePosNet3D(nn.Module):
                 ligand_pos) * batch_prior_stds
             if ligand_atom_mask is not None:
                 ligand_pos_next[ligand_atom_mask == 0] = ligand_pos[ligand_atom_mask == 0]
+            if fixed_position_mask is not None:
+                ligand_pos_next[fixed_position_mask] = anchored_positions[fixed_position_mask]
             ligand_pos = ligand_pos_next
             ligand_v = ligand_v_next
 

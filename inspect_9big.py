@@ -162,6 +162,9 @@ def prepare(cif, archive, output):
                         'CRBN from BTK example is a starting reference; compatibility and pose alignment unverified.',
                         'Seven-carbon linker boundary is an explicit case-specific assumption.',
                         'No diffusion generation, affinity or degradation validation performed.']}
+    for task in tasks:
+        task['experimental_generation_entrypoint'] = 'run_fixed_endpoint.py'
+        task['requires_aligned_e3_protein'] = task['role'] == 'e3_ligand'
     (output/'inspection.json').write_text(json.dumps(report,indent=2,ensure_ascii=False),encoding='utf-8')
     (output/'generation_tasks.json').write_text(json.dumps(tasks,indent=2),encoding='utf-8')
     print(json.dumps({k:report[k] for k in ('ligand_heavy_atoms','observed_heavy_atoms','missing_atom_names','part_sizes')},ensure_ascii=False))

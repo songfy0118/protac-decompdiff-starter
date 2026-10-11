@@ -6,6 +6,8 @@ assets/
 data/
 runs/
 results/
+outputs/
+*.npz
 work/
 *.pt
 *.ckpt
