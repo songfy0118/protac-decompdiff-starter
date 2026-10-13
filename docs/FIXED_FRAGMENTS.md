@@ -49,6 +49,12 @@ python prepare_xyz_cases.py --audit runs/xyz-audit --parent-case runs/9big-case 
 
 导出生成分子前，需要从3D坐标明确分配双键E/Z与原子手性，否则MolBlock可能把已有的双键几何写成 `STEREOANY`。本项目的共享导出函数已补上这一处理，并有烯烃回归测试。旧采样可用 `reexport_fixed_run.py --case ... --run ... --atom-mode basic --output ...` 从保存的NPZ重新导出；原运行不覆盖，新报告记录修正来源，不把重新导出当成新采样。
 
+### 候选质量与重建稳健性
+
+`assess_exploratory_candidates.py` 检查连通性、异常键长、非键原子重叠及蛋白碰撞，并报告常规分子描述符，不对PROTAC套用硬性Lipinski过滤。
+对linker坐标做小幅扰动，比较OpenBabel推断的边和键级，保存不同图假设及频数。这是单一推断方法的数值稳健性，不是正确键级概率或结合成功率。
+单分子MMFF94s放松在拷贝上进行，最多3000步，记录收敛与同一分子的能量下降；不覆盖原坐标，也不能把不同分子的绝对能量当作亲和力排序。
+
 ```bash
 python run_fixed_endpoint.py --case runs/9big-case --role warhead --checkpoint assets/decompdiff.pt --output runs/fixed-warhead --samples 1
 ```

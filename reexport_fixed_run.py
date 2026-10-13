@@ -33,6 +33,8 @@ def main():
                 'source_report_sha256':sha256(args.run/'report.json'), 'atom_encoding_mode':args.atom_mode,
                 'reference_sha256':sha256(reference_path)}
     with run_record(args.output, metadata) as output:
+        if (args.run/'pocket.pdb').exists():
+            shutil.copyfile(args.run/'pocket.pdb',output/'pocket.pdb')
         rows = []
         with Chem.SDWriter(str(output/'candidates.sdf')) as all_writer, Chem.SDWriter(str(output/'accepted.sdf')) as accepted_writer:
             for original in report['results']:
