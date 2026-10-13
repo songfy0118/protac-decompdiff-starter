@@ -8,6 +8,11 @@ from rdkit import Chem
 
 def export_ready_mol(mol):
     # Derive report SMILES from the same serialization a downstream SDF reader sees.
+    mol = Chem.Mol(mol)
+    if mol.GetNumConformers() and mol.GetConformer().Is3D():
+        # Otherwise MolBlock can mark a geometrically defined alkene as ANY,
+        # losing E/Z despite unchanged fixed-fragment coordinates and bonds.
+        Chem.AssignStereochemistryFrom3D(mol, replaceExistingTags=True)
     exported = Chem.MolFromMolBlock(Chem.MolToMolBlock(mol), sanitize=True, removeHs=True)
     if exported is None: raise ValueError('Generated molecule failed SDF round trip')
     return exported

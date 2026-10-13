@@ -13,6 +13,6 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-data.txt
       - run: python -m pip install -r requirements-data.txt
-      - run: python -m unittest -v test_pipeline test_fixed_candidate test_diffusion_constraints test_followup_case
+      - run: python -m unittest -v test_pipeline test_fixed_candidate test_diffusion_constraints test_followup_case test_xyz_inputs
       - run: python prepare_fragments.py --source-dir examples/table_inputs --source-map examples/table_inputs/sources.json --output-dir runs/demo
       - run: python verify_outputs.py --data-dir runs/demo

@@ -16,9 +16,10 @@ def main():
     parser.add_argument('--source-pdb', type=Path, help='Optional 5YJ1 public R-thalidomide mouse CRBN domain')
     args = parser.parse_args()
     case = args.case
-    with zipfile.ZipFile(args.archive) as archive:
-        ligand_block = archive.read('data/BTK_CRBN/Y70.pdb').decode()
-    protein_block = (case/'unbound_CRBN_4CI3_B.pdb').read_text()
+    if not args.source_pdb:
+        with zipfile.ZipFile(args.archive) as archive:
+            ligand_block = archive.read('data/BTK_CRBN/Y70.pdb').decode()
+        protein_block = (case/'unbound_CRBN_4CI3_B.pdb').read_text()
     source_description = 'Archive 4CI3/Y70 reference'
     if args.source_pdb:
         lines = args.source_pdb.read_text().splitlines()

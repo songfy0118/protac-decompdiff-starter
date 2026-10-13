@@ -180,6 +180,8 @@ def main():
                     mol = recon.reconstruct_from_generated_with_bond(r['pos'].cpu().numpy().astype(np.float64),
                         trans.get_atomic_number_from_index(r['v'].cpu(), mode=transform.ligand_atom_mode),
                         data.ligand_fc_bond_index.cpu().tolist(), r['bond'].cpu().numpy())
+                    mol.GetConformer().Set3D(True)
+                    Chem.AssignStereochemistryFrom3D(mol, replaceExistingTags=True)
                     mol = export_ready_mol(mol)
                     row.update(validate(reference, mol, task)); row['smiles'] = Chem.MolToSmiles(mol)
                     mol.SetProp('sample_id', str(sample)); mol.SetProp('fixed_check_passed', str(row['accepted']))

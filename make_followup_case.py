@@ -59,6 +59,8 @@ def main():
                   'source_report_sha256': hashlib.sha256((args.run/'report.json').read_bytes()).hexdigest(),
                   'source_role': report['role'], 'source_sample': args.sample,
                   'limits': 'Generated reference, not an experimental AK-1690 structure; protein pose limitations carry over.'}
+    if (args.parent_case/'provenance.json').exists():
+        provenance['parent_reference_provenance'] = json.loads((args.parent_case/'provenance.json').read_text())
     (args.output/'provenance.json').write_text(json.dumps(provenance, indent=2))
     print(json.dumps(provenance))
 

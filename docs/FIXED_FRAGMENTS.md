@@ -32,6 +32,23 @@ python -m unittest -v test_fixed_candidate
 
 ## 实验性采样
 
+### 仅有 DiffPROTACs XYZ 时
+
+官方 `Fenglei104/DiffPROTACs` 的采样路径预测元素与坐标，使用 `visualizer.save_xyz_file` 导出 XYZ。`dataset.parse_xyz` 在输入固定片段后追加重叠的碳占位点；`trainer.pred` 将这一输入也保存为 `true_.xyz`。自定义采样中的该文件不是实验参考分子，因此不能用于真实结构恢复率计算。
+
+本项目可对本例的63个固定原子，恢复9BIG已知片段的内部键，并用OpenBabel推断linker键。新增脚本不会把推断SDF标记为验证过的化学输入：
+
+```bash
+python audit_linker_xyz.py --archive /local/linker-xyz.zip --reference runs/9big-case/ak1690_observed.sdf --output runs/xyz-audit
+python prepare_xyz_cases.py --audit runs/xyz-audit --parent-case runs/9big-case --output runs/xyz-cases
+```
+
+这是本例的原子顺序/片段分界假设，不能用于任意XYZ。明确区分：推断连通性、价态检查、固定片段匹配、退出位点保持、立体化学与坐标。氢数在固定键修复后重新计算，否则无氢XYZ的OpenBabel价态标记会丢失手性信息。
+
+`prepare_xyz_cases.py` 导出可探索的参考、两个方向的任务分区及临时STAT6姿态。对齐来自刚性warhead模板迁移，报告RMSD与碰撞，不能替代对接或已验证的结合姿态。所有假设保存到 `provenance.json` 并由采样报告继承。
+
+导出生成分子前，需要从3D坐标明确分配双键E/Z与原子手性，否则MolBlock可能把已有的双键几何写成 `STEREOANY`。本项目的共享导出函数已补上这一处理，并有烯烃回归测试。旧采样可用 `reexport_fixed_run.py --case ... --run ... --atom-mode basic --output ...` 从保存的NPZ重新导出；原运行不覆盖，新报告记录修正来源，不把重新导出当成新采样。
+
 ```bash
 python run_fixed_endpoint.py --case runs/9big-case --role warhead --checkpoint assets/decompdiff.pt --output runs/fixed-warhead --samples 1
 ```
