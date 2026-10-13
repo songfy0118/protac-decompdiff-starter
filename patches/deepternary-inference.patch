@@ -1,0 +1,98 @@
+diff --git a/predict.py b/predict.py
+index e5c68ff..3228d4e 100644
+--- a/predict.py
++++ b/predict.py
+@@ -131,7 +131,13 @@ def get_rdkit_coords_with_fixed_ends(ligand, lig1, lig2, seed=None):
+     """
+     Codes from Reviewer #3.
+     Fixed two ends, only use rdkit to generate the rest of the coordinates"""
++    # Explicit Hs make tetrahedral stereo constraints well-defined during
++    # distance-geometry embedding; remove them before constructing model graphs.
++    expected_stereo = Chem.MolToSmiles(Chem.RemoveHs(ligand), isomericSmiles=True)
++    ligand = Chem.AddHs(ligand, addCoords=True)
+     params = rdDistGeom.ETKDGv3()
++    params.enforceChirality = True
++    params.maxIterations = 100
+     if seed is not None:
+         params.randomSeed = seed
+     ch1_map = ligand.GetSubstructMatch(lig1)
+@@ -154,6 +160,10 @@ def get_rdkit_coords_with_fixed_ends(ligand, lig1, lig2, seed=None):
+         raise RuntimeError("No conformer available after removing hydrogens.")
+     conf = ligand.GetConformer()
+     lig_coords = conf.GetPositions()
++    stereo_check = Chem.Mol(ligand)
++    Chem.AssignStereochemistryFrom3D(stereo_check, replaceExistingTags=True)
++    if Chem.MolToSmiles(stereo_check, isomericSmiles=True) != expected_stereo:
++        raise RuntimeError('Embedded coordinates do not preserve reference stereochemistry')
+     return ligand, lig_coords
+ 
+ 
+@@ -182,30 +192,7 @@ def get_lig_graph_protac(
+                 print(f"Error in getting RDKit coordinates: {e}")
+                 rdkit_coords = None
+         if rdkit_coords is None:
+-            print(f"{name} RDKit coordinate generation failed. Using ideal.sdf")
+-            embedding_failed_names.add(name)
+-            ideal_path = auto_download_ideal_sdf(name.split('_')[-1])
+-            ideal_mol = read_molecule(ideal_path, sanitize=True, remove_hs=True)
+-            if ideal_mol is None:
+-                raise ValueError(f"ideal_mol is None for {ideal_path}")
+-
+-            try:
+-                mol, rdkit_coords = get_rdkit_coords_with_fixed_ends(deepcopy(ideal_mol), lig1, lig2, seed=seed)
+-            except Exception as e:
+-                mol, rdkit_coords = get_rdkit_coords_v2(deepcopy(ideal_mol), seed=seed, use_random_coords=use_random_coords)
+-
+-            if mol is None:
+-                mol = ideal_mol
+-                try:
+-                    rdkit_coords = ideal_mol.GetConformer().GetPositions()
+-                except Exception as e:
+-                    raise RuntimeError(f"ideal_mol {ideal_path} RDKit coordinate generation failed: {e}")
+-            if rdkit_coords.shape != true_lig_coords.shape:
+-                raise RuntimeError(
+-                    f"{name}, rdkit_coords.shape = {rdkit_coords.shape}, \
+-                true_lig_coords.shape = {true_lig_coords.shape}"
+-                )
+-
++            raise RuntimeError(f"{name}: conformer generation failed; refusing automatic molecule substitution")
+         R, t = rigid_transform_Kabsch_3D(rdkit_coords.T, true_lig_coords.T)
+         lig_coords = (R @ (rdkit_coords).T).T + t.squeeze()
+     else:
+@@ -594,6 +581,7 @@ def _run_protac(
+         data['p2lig_p2_pocket_coords'][0] = (protein2_rot_T @ (data['p2lig_p2_pocket_coords'][0] - protein2_mean_to_remove).T).T + protein2_rot_b
+         data['rec2_coords_input'] = [data['rec2_graph'].ndata['x']]
+ 
++        correction_reference_coords = lig_graph.ndata["new_x"].clone()
+         with torch.no_grad():
+             outputs = cfg.nn_model(**data, mode="predict")[0]
+ 
+@@ -605,7 +593,7 @@ def _run_protac(
+         # Optional ligand correction
+         if apply_correction:
+             pred_lig_coords = correct_ligand(
+-                pred_lig_coords, lig_graph.ndata["new_x"], lig_origin
++                pred_lig_coords, correction_reference_coords, lig_origin
+             )
+             pred_lig_coords = torch.from_numpy(pred_lig_coords).float()
+ 
+@@ -616,10 +604,15 @@ def _run_protac(
+         # Save outputs (only complex_pred). Use temp files for intermediate ligand and p2.
+         with tempfile.TemporaryDirectory() as tmpdir:
+             lig_pred_path = os.path.join(tmpdir, f"lig_pred_{name}_{len(results)}.pdb")
+-            pred_lig = set_new_coords(
+-                lig_path, pred_lig_coords.cpu().numpy(), is_ligand=True
+-            )
+-            write_pdb(pred_lig, lig_pred_path)
++            # The documented SDF input cannot be parsed by PandasPdb.
++            # Export from the already-loaded molecule, preserving atom order.
++            predicted_mol = deepcopy(lig_origin)
++            conf = predicted_mol.GetConformer()
++            for atom_index, xyz in enumerate(pred_lig_coords.cpu().numpy()):
++                conf.SetAtomPosition(atom_index, tuple(float(v) for v in xyz))
++            Chem.MolToPDBFile(predicted_mol, lig_pred_path)
++            with Chem.SDWriter(os.path.join(outdir, f"ligand_pred_{len(results)}.sdf")) as writer:
++                writer.write(predicted_mol)
+ 
+             # Prepare p1 with chain A
+             p1_pred_file = os.path.join(tmpdir, f"p1_pred_{name}_{len(results)}.pdb")

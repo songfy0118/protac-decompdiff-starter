@@ -4,7 +4,11 @@ Validated against upstream commit `827821dccca31a5918bd0355e2d6bf70c072b6dd` on 
 
 Install CPU torch 2.2.1 and torchvision 0.17.1 from the official CPU wheel index, then install `requirements-deepternary-windows.txt`. Explicitly pin torch during dependency resolution to prevent unintended upgrades. These versions differ from the upstream Linux CUDA environment; a successful inference verifies execution, not equivalence of every numerical result.
 
-Apply `patches/deepternary-sdf-export.patch` to that upstream checkout. The documented SDF input is otherwise passed to a PDB-only reader at export. The patch exports the already-loaded RDKit molecule, retains atom order, and additionally saves predicted ligand SDF files. It does not change model inference.
+Apply `patches/deepternary-inference.patch` to a clean checkout of that upstream commit. This comprehensive patch supersedes `deepternary-sdf-export.patch`; do not apply both. It includes SDF export and stereo-preserving conformer preparation. Model weights are unchanged, but starting conformers and corrected outputs change.
+
+The documented SDF input is otherwise passed to a PDB-only reader at export. The patch exports the already-loaded RDKit molecule, retains atom order, and additionally saves predicted ligand SDF files.
+
+Conformers are embedded with explicit hydrogens and enforced chirality, then converted back to the original heavy-atom graph. Coordinate-derived stereochemistry must match the reference before inference. A failed conformer raises an error instead of automatically downloading a different molecule. Correction coordinates are cloned before the model mutates graph coordinates in place. Local geometry repair uses a 1200-iteration budget and still records convergence separately from geometry checks.
 
 Set process environment `DGLBACKEND=pytorch`, and set `TEMP` and `TMP` to a writable local project directory in sandboxed environments. Use explicit `--config` and `--checkpoint` paths rather than relying on the checkpoint archive's original machine paths.
 
@@ -28,3 +32,5 @@ Interpretation: the predicted P2 RMSD is a surrogate ranking score, not RMSD mea
 5. `refine_deepternary.py --out PREDICTIONS --reference INPUTS/ligand.sdf` locally relaxes at most five highest-ranked stereochemically compatible predictions. It records convergence, displacement, clashes, and stereo. Nonconverged outputs remain exploratory. Recheck full-protein contacts and bond lengths before selecting any result.
 
 Evaluation validation: original and newly generated ligands each completed 40-seed CPU runs against the transferred human reference. Geometry audits and local refinement completed; the existing four geometry-quality regression tests passed. Successful execution does not imply every output is valid or that the generated ligand outperforms its parent.
+
+Stereo regression: `test_deepternary_stereo.py` checks multiple seeds of a molecule with multiple stereocenters, unchanged heavy-atom order, and rejection of forced inverted coordinates. It reads only the two pure conformer functions from the optional checkout, avoiding model imports. Set `DEEPTERNARY_SOURCE` to the patched `predict.py` if running outside the development workspace. These two tests and the four geometry-quality tests passed. Both private 40-seed prediction sets were rerun after the correction; structures and case metrics remain local.

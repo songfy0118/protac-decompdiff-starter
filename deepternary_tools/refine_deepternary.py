@@ -10,6 +10,7 @@ from scipy.optimize import minimize
 parser = argparse.ArgumentParser()
 parser.add_argument('--out',type=Path,default=Path('outputs/deepternary-linker5-40seeds-2026-10-12'))
 parser.add_argument('--reference',type=Path,default=Path('outputs/deepternary-linker5-inputs-2026-10-12/ligand.sdf'))
+parser.add_argument('--maxiter',type=int,default=1200)
 args = parser.parse_args()
 out = args.out
 audit = json.loads((out/'geometry_audit.json').read_text())
@@ -44,7 +45,7 @@ for record in eligible:
         energy += 2*float((displacement**2).sum())
         grad[:nheavy] += 4*displacement
         return energy,grad.ravel()
-    optimized = minimize(objective,start.ravel(),jac=True,method='L-BFGS-B',options={'maxiter':400,'ftol':1e-8})
+    optimized = minimize(objective,start.ravel(),jac=True,method='L-BFGS-B',options={'maxiter':args.maxiter,'ftol':1e-8})
     xyz = optimized.x.reshape(-1,3)
     for i,p in enumerate(xyz):
         mol.GetConformer().SetAtomPosition(i,tuple(float(x) for x in p))
