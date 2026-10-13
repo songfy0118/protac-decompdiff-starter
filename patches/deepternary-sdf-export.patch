@@ -1,0 +1,24 @@
+diff --git a/predict.py b/predict.py
+index e5c68ff..b47cf1b 100644
+--- a/predict.py
++++ b/predict.py
+@@ -616,10 +616,15 @@ def _run_protac(
+         # Save outputs (only complex_pred). Use temp files for intermediate ligand and p2.
+         with tempfile.TemporaryDirectory() as tmpdir:
+             lig_pred_path = os.path.join(tmpdir, f"lig_pred_{name}_{len(results)}.pdb")
+-            pred_lig = set_new_coords(
+-                lig_path, pred_lig_coords.cpu().numpy(), is_ligand=True
+-            )
+-            write_pdb(pred_lig, lig_pred_path)
++            # The documented SDF input cannot be parsed by PandasPdb.
++            # Export from the already-loaded molecule, preserving atom order.
++            predicted_mol = deepcopy(lig_origin)
++            conf = predicted_mol.GetConformer()
++            for atom_index, xyz in enumerate(pred_lig_coords.cpu().numpy()):
++                conf.SetAtomPosition(atom_index, tuple(float(v) for v in xyz))
++            Chem.MolToPDBFile(predicted_mol, lig_pred_path)
++            with Chem.SDWriter(os.path.join(outdir, f"ligand_pred_{len(results)}.sdf")) as writer:
++                writer.write(predicted_mol)
+ 
+             # Prepare p1 with chain A
+             p1_pred_file = os.path.join(tmpdir, f"p1_pred_{name}_{len(results)}.pdb")
